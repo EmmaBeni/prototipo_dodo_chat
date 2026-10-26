@@ -14,7 +14,7 @@ body{background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif;displa
 .pg{position:absolute;inset:0;overflow:hidden;display:flex;justify-content:center;align-items:center}
 .pg iframe.live{pointer-events:auto}
 .pg iframe{border:0;width:1280px;height:800px;flex:none;pointer-events:none;transform-origin:center center;background:#fff}
-#bar{display:flex;gap:12px;align-items:center;justify-content:center;padding:10px 12px 14px}
+#bar{position:relative;z-index:10;display:flex;gap:12px;align-items:center;justify-content:center;padding:10px 12px 14px}
 #bar button{border:0;border-radius:99px;background:var(--br);color:#fff;font-weight:700;padding:9px 20px;cursor:pointer;font-size:14px}
 #bar button:disabled{opacity:.35;cursor:default}
 #ind{min-width:80px;text-align:center}
@@ -4638,7 +4638,13 @@ const ind=document.getElementById('ind'),pv=document.getElementById('pv'),nx=doc
 function upd(){const i=pf.getCurrentPageIndex();ind.textContent=(i+1)+' / '+N;pv.disabled=i<=0;nx.disabled=i>=N-1}
 pf.on('flip',upd);upd();
 pv.onclick=()=>pf.flipPrev();nx.onclick=()=>pf.flipNext();
-addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')pf.flipNext();if(e.key==='ArrowLeft')pf.flipPrev()});
+function key(e){if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();pf.flipNext()}if(e.key==='ArrowLeft')pf.flipPrev()}
+addEventListener('keydown',key);
+// Las diapos "live" capturan foco y mouse: al volver de un link el libro quedaba trabado.
+function release(){try{dispatchEvent(new MouseEvent('mouseup',{clientX:innerWidth/2,clientY:innerHeight/2}))}catch(e){}
+ const a=document.activeElement;if(a&&a.tagName==='IFRAME'){a.blur();window.focus()}}
+addEventListener('focus',release);addEventListener('blur',release);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)release()});
 function fit(pg){const f=pg.querySelector('iframe'),w=pg.clientWidth,h=pg.clientHeight;if(!w||!h)return;
  let ch=f._h||H;const k=Math.min(w/W,h/ch);f.style.height=ch+'px';f.style.transform='scale('+k+')'}
 document.querySelectorAll('.pg').forEach(pg=>{const f=pg.querySelector('iframe');
@@ -4649,6 +4655,12 @@ document.querySelectorAll('.pg').forEach(pg=>{const f=pg.querySelector('iframe')
  f.addEventListener('load',()=>{f.style.background='transparent';meas();
   try{f.contentDocument.fonts.ready.then(meas);f.contentDocument.querySelectorAll('img').forEach(i=>i.addEventListener('load',meas));
   new ResizeObserver(meas).observe(f.contentDocument.querySelector('section'))}catch(e){}
+  if(f.classList.contains('live'))try{const w=f.contentWindow;
+   w.addEventListener('keydown',key);
+   ['mousemove','mouseup'].forEach(t=>w.addEventListener(t,e=>{const r=f.getBoundingClientRect(),s=r.width/f.offsetWidth;
+    dispatchEvent(new MouseEvent(t,{clientX:r.left+e.clientX*s,clientY:r.top+e.clientY*s,buttons:e.buttons}))}));
+   w.document.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>setTimeout(release,0)));
+   w.addEventListener('focus',()=>setTimeout(release,0))}catch(e){}
   setTimeout(meas,500);setTimeout(meas,1500)});
  new ResizeObserver(()=>fit(pg)).observe(pg)});
 </script></body></html>
